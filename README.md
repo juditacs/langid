@@ -47,6 +47,19 @@ The output is a tab-separated file with the following columns:
 
 At most 5 languages are assigned to one line of input or one document.
 
+### Examples
+
+Reading from STDIN:
+
+    echo "black cats and dogs" | python identify_lang.py > results
+
+Identify each document in a directory
+
+    mkdir test
+    echo "black cats and dogs" > test/en
+    echo "fekete kutyák és macskák" > test/hu
+    python identify_lang.py --test-files test > results
+
 ## Options
 
 | Option  | Explanation | Default |
