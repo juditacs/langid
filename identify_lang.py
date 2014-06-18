@@ -1,232 +1,175 @@
-#!/usr/bin/env python2.7
-from sys import exit, stderr
-from os import listdir, path, makedirs
-from argparse import ArgumentParser
-import signal
-import readline
+import argparse
+import itertools
+import math
 from collections import defaultdict
-from itertools import product
+from sys import stderr, stdin
+from os import path, listdir
 import re
 
-def get_seen_ngrams(tokens_, n, cut=0):
-    ngrams = defaultdict(int)
-    if cut > 0:
-        tokens = tokens_[0:cut+1]
+
+whitespace_re = re.compile(r'\s+', re.UNICODE)
+
+
+def identify_input(models):
+    if args.test_dir:
+        for fn in listdir(args.test_dir):
+            with open(path.join(args.test_dir, fn)) as f:
+                clean = clean_text(f.read().decode('utf8', 'ignore'))[:args.test_cutoff]
+                probs, st = compute_probabilities(clean, models)
+                print(fn + '\t' + '\t'.join('{0}\t{1}'.format(lang, prob) for lang, prob in sorted(probs.iteritems(), key=lambda x: -x[1])[0:5] if prob > float('-inf') and prob < 0))
     else:
-        tokens = tokens_
-    for k in range(1, n+1):
-        for i, ngram in enumerate(tokens[k-1:]):
-            ngrams[tokens[i:i+k]] += 1
+        for l in stdin:
+            clean = clean_text(l.decode('utf8', 'ignore'))[:args.test_cutoff]
+            probs, st = compute_probabilities(clean, models)
+            print(clean.encode('utf8') + '\t' + '\t'.join('{0}\t{1}'.format(lang, prob) for lang, prob in sorted(probs.iteritems(), key=lambda x: -x[1])[0:5] if prob > float('-inf') and prob < 0))
+
+
+def compute_probabilities(input_str, models):
+    input_ngrams = get_seen_ngrams(input_str)
+    probs = defaultdict(lambda: 0.0)
+    stats = defaultdict(lambda: [0, 0])
+    for lang, model in models.iteritems():
+        for ngram in input_ngrams:
+            if len(ngram) != args.N:
+                continue
+            stats[lang][0] += 1
+            if ngram in model:
+                probs[lang] += model[ngram]
+            else:
+                stats[lang][1] += 1
+                if args.verbose:
+                    stderr.write('Ngram {0} not found in {1} model\n'.format(ngram, lang))
+                #probs[lang] += float('-inf')
+    return probs, stats
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument('-N', type=int, default=3)
+    p.add_argument('-c', '--cutoff', type=int, default=1000)
+    p.add_argument('--test-cutoff', type=int, default=100)
+    p.add_argument('-d', '--discount', type=float, default=0.5)
+    p.add_argument('-m', '--mode', default='test', choices=['train', 'test'])
+    p.add_argument('--train-files', default='train_files', type=str)
+    p.add_argument('--test-dir', type=str)
+    p.add_argument('--models', default='models', dest='model_dir', type=str)
+    p.add_argument('-l', '--lower', action='store_true', default=False)
+    p.add_argument('-v', '--verbose', action='store_true', default=False)
+    return p.parse_args()
+
+
+def clean_text(text):
+    if args.lower:
+        t = text.lower()
+    else:
+        t = text
+    #t = t.replace('\n', ' ')
+    #t = t.replace('\t', ' ')
+    t = whitespace_re.sub(' ', t)
+    return t.strip()
+
+
+def train_models():
+    stderr.write('Training models...\n')
+    # reading train_files
+    for lang in listdir(args.train_files):
+        stderr.write(lang + '\n')
+        with open(path.join(args.train_files, lang)) as f:
+            text = f.read().decode('utf8')[0:args.cutoff]
+            text_clean = clean_text(text)
+        ngrams = get_seen_ngrams(text_clean)
+        model = get_probabilities(ngrams)
+        write_model(model, lang)
+
+
+def get_probabilities(ngrams):
+    probs = defaultdict(lambda: float('-inf'))
+    compute_unigram_probs(probs, ngrams)
+    alphabet = set(probs.keys())
+    for n in range(2, args.N + 1):
+        compute_katz_probs(probs, ngrams, n, alphabet)
+    return probs
+
+
+def compute_katz_probs(probs, ngrams, n, alphabet):
+    discount = args.discount
+    leftover = defaultdict(float)
+    # iterate seen ngrams and compute probability
+    for ngram, count in ngrams.iteritems():
+        if len(ngram) != n:
+            continue
+        if ngram in probs:
+            print('BAJ VAN')
+        probs[ngram] = math.log((float(count) - discount) / ngrams[ngram[:-1]])
+        leftover[ngram[:-1]] += (float(count) - discount) / ngrams[ngram[:-1]]
+    missing = defaultdict(float)
+    # probability of every other ngram
+    for ngram_ in itertools.product(alphabet, repeat=n):
+        ngram = ''.join(ngram_)
+        if ngram in probs:
+            continue
+        missing[ngram[:-1]] += math.exp(probs[ngram[1:]])
+    for ngram_ in itertools.product(alphabet, repeat=n):
+        ngram = ''.join(ngram_)
+        if ngram in probs:
+            continue
+        try:
+            probs[ngram] = math.log((1 - leftover[ngram[:-1]])) + probs[ngram[1:]] - math.log(missing[ngram[:-1]])
+        except ValueError:
+            probs[ngram] = float('-inf')
+
+
+def compute_unigram_probs(probs, ngrams):
+    unigram_sum = sum((v for k, v in ngrams.iteritems() if len(k) == 1))
+    for ngram, count in ngrams.iteritems():
+        # skip if not a unigram
+        if len(ngram) > 1:
+            continue
+        probs[ngram] = math.log(float(count) / unigram_sum)
+
+
+def get_seen_ngrams(text):
+    ngrams = defaultdict(int)
+    for n in range(1, args.N + 1):
+        for i in range(0, len(text) - n + 1):
+            ngram = text[i:i + n]
+            ngrams[ngram] += 1
     return ngrams
 
-def signal_handler(signal, frame):
-    print 'Kilepes...'
-    exit(0)
 
-def decide_lang(text, models, cfg):
-    n = cfg.N
-    probs = defaultdict(float)
-    ngrams = get_seen_ngrams(text, n)
-    if len(text) < n:
-        for lang in models:
-            probs[lang] = 1.0
-            for ngram in ngrams:
-                probs[lang] *= models[lang][ngram]
-    else:
-        for lang in models:
-            probs[lang] = 1.0
-            for ngram in ngrams:
-                if len(ngram) != n:
-                    continue
-                if ngram in models[lang]:
-                    probs[lang] *= models[lang][ngram]
-                else:
-                    if cfg.log > 1:
-                        print lang.encode('utf8') + ": ngram nem szerepel a modellben: " + ngram.encode('utf8')
-                    probs[lang] = 0.0
-                    break
-    max_prob = 0.0
-    max_lang = ""
-    for l in probs.keys():
-        if probs[l] > max_prob:
-            max_lang = l
-            max_prob = probs[l]
-    if cfg.log > 0:
-        for l, pr in sorted(probs.iteritems(), key=lambda x: x[1]):
-            print '{0} {1}'.format(l.encode('utf8'), pr)
-    if max_prob == 0.0:
-        print "P=0 minden nyelvre"
-    else:
-        print max_lang.lower()
+def write_model(model, lang):
+    with open(path.join(args.model_dir, lang + '.model'), 'w') as f:
+        f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(model.iteritems(), key=lambda x: -x[1])).encode('utf8') + '\n')
+        stderr.write('Model written to file: {0}\n'.format(path.join(args.model_dir, lang + '.model')))
 
-def trim_text(text, cfg):
-    text_ = text.decode('utf8')
-    text_ = text_.replace(',', ' , ')
-    text_ = text_.replace('\.', ' \. ')
-    text_ = re.sub('[\s\n]+', ' ', text_, flags=re.UNICODE)
-    if cfg.lower:
-        text_ = text_.lower()
-    if cfg.nospec:
-        text_ = re.sub('[^\w\s\.\,]+', '', text_, flags=re.UNICODE)
-        text_ = re.sub('[\d]+', '', text_, flags=re.UNICODE)
-    if cfg.nospace:
-        text_ = re.sub('\s+', '', text_, flags=re.UNICODE)
-    return text_
 
-def get_prob(ngrams, prob_mode, alphabet, n=3):
-    if prob_mode == "normal":
-        return get_prob_simple(ngrams, n)
-    elif prob_mode == "katz":
-        return katz_backoff(ngrams, alphabet, n)
+def write_models(models):
+    for lang, model in models.iteritems():
+        with open(path.join(args.model_dir, lang + '.model'), 'w') as f:
+            f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(model.iteritems(), key=lambda x: -x[1])).encode('utf8') + '\n')
 
-def get_prob_simple(ngrams, n=3):
-    prob = defaultdict(float)
-    ngram_sum = dict()
-    for i in range(1, n+1):
-        ngram_sum[i] = sum([v for (k, v) in ngrams.items() if len(k) == i])
-    for ngram, cnt in ngrams.items():
-        prob[ngram] = float(cnt)/ngram_sum[len(ngram)]
-    return prob
 
-def katz_backoff(ngrams, alphabet, n, discount=0.5):
-    prob = defaultdict(float)
-    # n=1
-    unigram_sum = sum([v for k, v in ngrams.items() if len(k) == 1])
-    for unigram, cnt in ngrams.items():
-        if len(unigram) > 1:
-            continue
-        prob[unigram] = float(cnt)/unigram_sum
-    # n>1
-    for i in range(2, n+1):
-        missing = defaultdict(float)
-        for ngram, cnt in ngrams.items():
-            if len(ngram) != i:
-                continue
-            prob[ngram] = float(cnt-discount)/ngrams[ngram[0:-1]]
-            missing[ngram[0:-1]] += prob[ngram]
-        for ngr_ in product(alphabet, repeat=i):
-            ngr = ''.join(ngr_)
-            if ngr in ngrams:
-                continue
-            prob[ngr] = (1 - missing[ngr[0:-1]]) * prob[ngr[1:]]
-    return prob
+def read_models():
+    models = defaultdict(lambda: defaultdict(float))
+    for fn in listdir(args.model_dir):
+        lang = fn.rstrip('model')[:-1]
+        stderr.write('Reading {0}\n'.format(fn))
+        with open(path.join(args.model_dir, fn)) as f:
+            for l in f:
+                ngram, prob = l.decode('utf8').split('\t')
+                models[lang][ngram] = float(prob)
+    return models
 
-def linear_interpolation(text, ngrams, weights):
-    if len(weights) < 3:
-        print "weights not specified"
-        return 
-    prob = 1.0
-    unigram_sum = float(sum([v for k, v in ngrams.items() if len(k) == 1]))
-    bigram_sum = float(sum([v for k, v in ngrams.items() if len(k) == 2]))
-    trigram_sum = float(sum([v for k, v in ngrams.items() if len(k) == 3]))
-    for k in range(0, len(text)-1):
-        prob *= (weights[0] * ngrams[text[k:k+3]] / trigram_sum + \
-                weights[1] * ngrams[text[k+1:k+3]] / bigram_sum + \
-                weights[2] * ngrams[text[k+2:k+3]] / unigram_sum)
-    return prob
+args = parse_args()
 
-def setup_parser():
-    parser = ArgumentParser()
-    parser.add_argument('-t', '--train', dest='train', default='train_files')
-    parser.add_argument('-s', '--nospecial', dest='nospec', action='store_true')
-    parser.add_argument('--lower', dest='lower', action='store_true', default=False)
-    parser.add_argument('--noenter', dest='noenter', action='store_true', default=False)
-    parser.add_argument('--nospace', dest='nospace', action='store_true', default=False)
-    parser.add_argument('-w', '--write-models', dest='write_models', type=str,
-                       default='models/default', 
-                        help='write trained models. Destination should be the prefix of files')
-    parser.add_argument('-r', '--read-models', dest='read_models', type=str,
-                       default='')
-    parser.add_argument('--just-train', dest='just_train', action='store_true',
-                        default=False)
-    parser.add_argument('-l', '--log', dest='log', type=int, default=0, 
-                       help='logging level')
-    parser.add_argument('-c', '--cutoff', dest='cutoff', default=0, type=int)
-    parser.add_argument('-N', '--N', dest='N', default=3, type=int)
-    parser.add_argument('-k', '--k', dest='k', default=20, type=int)
-    parser.add_argument('-m', '--mode', dest='mode', default='normal', choices=('normal', 'katz'))
-    return parser
-
-def read_probs(fn, probs):
-    try:
-        f = open(fn)
-    except OSError:
-        stderr.write('File not found {0}\n'.format(fn))
-
-    for l in f:
-        try:
-            ngram, prob = l.decode('utf8').strip().split('\t')
-            probs[ngram] = float(prob)
-        except UnicodeDecodeError:
-            stderr.write('UnicodeDecodeError on line: {0}'.format(l))
-        except ValueError:
-            stderr.write('ValueError on line: {0}'.format(l))
-    try:
-        f.close()
-    except:
-        pass
-
-def get_k_langs(cfg):
-    i = 0
-    f = open(cfg.train)
-    train_files = list()
-    for l in f:
-        i += 1
-        if i > cfg.k:
-            f.close()
-            return train_files
-        lang, fn = l.decode('utf8').strip().split('\t')
-        train_files.append((lang, fn))
-    f.close()
-    return train_files
 
 def main():
-    parser = setup_parser()
-    cfg = parser.parse_args()
-    train_files = get_k_langs(cfg)
-    probs = defaultdict(lambda: defaultdict(float))
-    signal.signal(signal.SIGINT, signal_handler)
-    ngrams = dict()
-
-    if cfg.read_models:
-        basedir = '/'.join(cfg.read_models.strip().split('/')[:-1])
-        basedir = basedir if basedir else '.'
-        file_base = cfg.read_models.split('/')[-1] + '.'
-        for fn in listdir(basedir):
-            if not fn.startswith(file_base):
-                continue
-            lang = fn.split(file_base)[-1].strip()
-            read_probs(basedir + '/' + fn, probs[lang])
+    if args.mode == 'train':
+        train_models()
+        #write_models(models)
     else:
-        for lang, fn in train_files:
-            f = open(fn)
-            print lang.encode('utf8')
-            tokens = trim_text(f.read(), cfg)
-            ngrams[lang] = get_seen_ngrams(tokens, cfg.N, cfg.cutoff)
-            probs[lang] = get_prob(ngrams[lang], cfg.mode, set(tokens), cfg.N)
-            f.close()
-
-    if cfg.write_models:
-        if not path.exists('/'.join(cfg.write_models.split('/')[:-1])):
-            makedirs('/'.join(cfg.write_models.split('/')[:-1]))
-        for lang in probs.keys():
-            f = open(cfg.write_models + '.' + lang, 'w')
-            f.write('\n'.join(['{0}\t{1}'.format(k.encode('utf8'), v) for k, v in probs[lang].items()]))
-            f.close()
-            print lang.encode('utf8') + u' modell elmentve: '.encode('utf8') + cfg.write_models + '.' + lang.encode('utf8')
-        print "Modellek fajlba irva"
-    print "Tanitas kesz."
-        
-    if cfg.just_train:
-        exit(0)
-
-    while True:
-        try:
-            unk = raw_input('> ')
-            decide_lang(trim_text(unk, cfg), probs, cfg)
-        except Exception:
-            continue
-    
+        models = read_models()
+        identify_input(models)
 
 if __name__ == '__main__':
     main()
