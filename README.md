@@ -85,3 +85,7 @@ Seen and unseen trigrams are counted and printed to the verbose output. If the v
 
 ...
 
+## Contact
+
+Please send your feedback, questions and bugreports to judit@sch.bme.hu
+
