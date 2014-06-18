@@ -23,14 +23,14 @@ A default training would look like this
 These commands will train the language models using the training files found in the directory `train` (`--train-files` option).
 By deafult there are train files for 7 languages (Dutch, English, French, German, Hungarian, Italian, Spanish)
 but you're free to add more or use different ones.
-The trained models are in the `model` directory (`--model` option).
+The trained models are in the `model` directory (`--model-files` option).
 
 ## Language detecting mode
 
 Once the models are trained, you can use them to identify the language of the input.
 There are two kinds of input supported:
 
-1. STDIN: each line of the standard input is treated as a separate document
+1. STDIN: each line of the standard input is treated as a separate document. This is the default.
 2. Document-level: a language is assigned to each document in a directory
 
 The output is a tab-separated file with the following columns:
@@ -50,7 +50,35 @@ At most 5 languages are assigned to one line of input or one document.
 | Option  | Explanation | Default |
 | ------------- | ------------- | --- |
 | `-N` | N in ngram | 3 |
+| `-c` | train cutoff: use first c characters of each train file | 10,000 |
+| `--test-cutoff` | test cutoff: use first c characters of each identifiable file. You may use this to avoid very low probabilities in case of very large documents | 100 |
+| `-l`, `--lower` | Lowercase all input. If specified, make sure that the models were also built with this flag. | False |
+| `-d` | Discount parameter of Katz-Backoff. If changing it from 0.5 helps, please let me know. | 0.5 |
+| `-m`, `--mode` | Train or test mode | test |
+| `--train-files` | Location of train files | `train` |
+| `--test-files` | Location of train files. STDIN is read if this option is not specified | None |
+| `--model-files` | Location of model files. Models are written to this directory in training mode and are read from this directory in testing mode. | `model` |
+| `-v`, `--verbose` | Verbose output. See below | False |
 
 ## Mathematical correctness
+
+Mathematical correctness suffers in two cases:
+
+1. Initial and ending probabilities are ignored because of the lack of document level training data.
+2. Unseen characters (and therefore unseen trigrams) are counted but the probabilities are not nuked (they would be zero or -inf in log-prob in this case).
+
+### Verbose output
+
+Seen and unseen trigrams are counted and printed to the verbose output. If the verbose output is used, the columns change slightly:
+
+1. Input line from STDIN (type 1 input) or the path of the document (type 2 input)
+2. Most probable language
+3. Log-probability of the language
+4. Number of trigrams appearing in the language model
+5. Number of trigrams not appearing in the language model
+4. 2nd most probable language
+5. Log-probability of the language
+4. Number of trigrams appearing in the language model
+5. Number of trigrams not appearing in the language model
 
 
