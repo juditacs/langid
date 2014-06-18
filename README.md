@@ -30,11 +30,19 @@ The trained models are in the `model` directory (`--model` option).
 Once the models are trained, you can use them to identify the language of the input.
 There are two kinds of input supported:
 
-1 STDIN: each line of the standard input is treated as a separate document
-
-2 Document-level: a language is assigned to each document in a directory
+1. STDIN: each line of the standard input is treated as a separate document
+2. Document-level: a language is assigned to each document in a directory
 
 The output is a tab-separated file with the following columns:
+
+1. Input line from STDIN (type 1 input) or the path of the document (type 2 input)
+2. Most probable language
+3. Log-probability of the language
+4. 2nd most probable language
+5. Log-probability of the language
+...
+
+At most 5 languages are assigned to one line of input or one document.
 
 
 
