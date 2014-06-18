@@ -77,7 +77,7 @@ Identify each document in a directory
 
 ## Mathematical correctness
 
-Mathematical correctness suffers in two cases:
+Mathematical correctness suffers for two reasons:
 
 1. Initial and ending probabilities are ignored because of the lack of document level training data.
 2. Unseen characters (and therefore unseen trigrams) are counted but the probabilities are not nuked (they would be zero or -inf in log-prob in this case).
