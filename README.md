@@ -40,15 +40,15 @@ The output is a tab-separated file with the following columns:
 3. Log-probability of the language
 4. 2nd most probable language
 5. Log-probability of the language
+
 ...
 
 At most 5 languages are assigned to one line of input or one document.
 
+## Options
+
+| `-N` | N in ngram | 3 |
+
+## Mathematical correctness
 
 
-
-
-## Upcoming features
-
-1. Reading from stdin and identifying language for each line.
-2. Change texts and filenames to English from Hungarian.
