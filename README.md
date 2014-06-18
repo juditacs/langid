@@ -47,6 +47,8 @@ At most 5 languages are assigned to one line of input or one document.
 
 ## Options
 
+| Option  | Explanation | Default |
+| ------------- | ------------- | --- |
 | `-N` | N in ngram | 3 |
 
 ## Mathematical correctness
