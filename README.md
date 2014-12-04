@@ -1,7 +1,7 @@
 langid
 ======
 
-A simple language identifier using trigram statistics with Katz-Backoff smoothing.
+A simple language identifier using trigram statistics with Katz's back-off smoothing.
 
 The training files are the respective Wikipedia articles 'dog' for each language.
 If the article was too short, I also added another the article about the country's capital.
@@ -68,7 +68,7 @@ Identify each document in a directory
 | `-c` | Train cutoff: use first c characters of each train file | 10,000 |
 | `--test-cutoff` | Test cutoff: use first c characters of each identifiable file. You may use this to avoid very low probabilities in case of very large documents | 100 |
 | `-l`, `--lower` | Lowercase all input. If specified, make sure that the models were also built with this flag. | False |
-| `-d` | Discount parameter of Katz-Backoff. If changing it from 0.5 helps, please let me know. | 0.5 |
+| `-d` | Discount parameter of Katz's back-off. If changing it from 0.5 helps, please let me know. | 0.5 |
 | `-m`, `--mode` | Train or test mode | test |
 | `--train-files` | Directory containing the train files | `train` |
 | `--test-files` | Directory containing the test files. STDIN is read if this option is not specified | None |
