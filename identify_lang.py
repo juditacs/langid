@@ -34,19 +34,19 @@ def output(prefix, probs, seen):
         print(prefix.encode('utf8') + '\t' +
               '\t'.join(u'{0}\t{1}\t{2}\t{3}'.format(lang, prob, seen[lang][0], seen[lang][1])
                         for lang, prob in
-                        sorted(iter(probs.items()), key=lambda x: -x[1])[0:5] if prob > float('-inf')).encode('utf8'))
+                        sorted(probs.items(), key=lambda x: -x[1])[0:5] if prob > float('-inf')).encode('utf8'))
     else:
         print(prefix.encode('utf8') + '\t' +
               '\t'.join(u'{0}\t{1}'.format(lang, prob)
                         for lang, prob in
-                        sorted(iter(probs.items()), key=lambda x: -x[1])[0:5] if prob > float('-inf')).encode('utf8'))
+                        sorted(probs.items(), key=lambda x: -x[1])[0:5] if prob > float('-inf')).encode('utf8'))
 
 
 def compute_probabilities(input_str, models):
     input_ngrams = get_seen_ngrams(input_str)
     probs = defaultdict(lambda: 0.0)
     stats = defaultdict(lambda: [0, 0])
-    for lang, model in iter(models.items()):
+    for lang, model in models.items():
         for ngram in input_ngrams:
             if len(ngram) != args.N:
                 continue
@@ -110,7 +110,7 @@ def compute_katz_probs(probs, ngrams, n, alphabet):
     discount = args.discount
     leftover = defaultdict(float)
     # iterate seen ngrams and compute probability
-    for ngram, count in iter(ngrams.items()):
+    for ngram, count in ngrams.items():
         if len(ngram) != n:
             continue
         if ngram in probs:
@@ -135,8 +135,8 @@ def compute_katz_probs(probs, ngrams, n, alphabet):
 
 
 def compute_unigram_probs(probs, ngrams):
-    unigram_sum = sum((v for k, v in iter(ngrams.items()) if len(k) == 1))
-    for ngram, count in iter(ngrams.items()):
+    unigram_sum = sum((v for k, v in ngrams.items() if len(k) == 1))
+    for ngram, count in ngrams.items():
         # skip if not a unigram
         if len(ngram) > 1:
             continue
@@ -154,14 +154,14 @@ def get_seen_ngrams(text):
 
 def write_model(model, lang):
     with open(path.join(args.model_dir, lang + '.model'), 'w', encoding='utf-8') as f:
-        f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(iter(model.items()), key=lambda x: -x[1])) + '\n') # .encode('utf8')
+        f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(model.items(), key=lambda x: -x[1])) + '\n') # .encode('utf8')
         stderr.write('Model written to file: {0}\n'.format(path.join(args.model_dir, lang + '.model')))
 
 
 def write_models(models):
-    for lang, model in iter(models.items()):
+    for lang, model in models.items():
         with open(path.join(args.model_dir, lang + '.model'), 'w', encoding='utf-8') as f:
-            f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(iter(models.items()), key=lambda x: -x[1])) + '\n') # .encode('utf8')
+            f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(models.items(), key=lambda x: -x[1])) + '\n') # .encode('utf8')
 
 
 def read_models():
