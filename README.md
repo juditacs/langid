@@ -8,7 +8,9 @@ If the article was too short, I also added another the article about the country
 
 ## Requirements
 
-Linux shell and Python2.7 with standard modules should be enough. 
+**IMPORTANT** langid has been ported to Python 3 by @adbar
+
+Linux shell and Python3 with standard modules should be enough. 
 You may need a few Gigabytes of memory for many languages or very large training files.
 
 ## Training mode
