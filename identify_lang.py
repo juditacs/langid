@@ -19,12 +19,12 @@ def identify_input(models):
         for fn in listdir(args.test_files):
             doc_path = path.join(args.test_files, fn)
             with open(doc_path, 'r', encoding='utf-8') as f:
-                clean = clean_text(f.read())[:args.test_cutoff] # was f.read().decode('utf8', 'ignore')
+                clean = clean_text(f.read())[:args.test_cutoff]
                 probs, st = compute_probabilities(clean, models)
                 output(doc_path, probs, st)
     else:
         for l in stdin:
-            clean = clean_text(l)[:args.test_cutoff] # was l.decode('utf8', 'ignore')
+            clean = clean_text(l)[:args.test_cutoff]
             probs, st = compute_probabilities(clean, models)
             output(clean, probs, st)
 
@@ -154,14 +154,14 @@ def get_seen_ngrams(text):
 
 def write_model(model, lang):
     with open(path.join(args.model_dir, lang + '.model'), 'w', encoding='utf-8') as f:
-        f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(model.items(), key=lambda x: -x[1])) + '\n') # .encode('utf8')
+        f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(model.items(), key=lambda x: -x[1])) + '\n')
         stderr.write('Model written to file: {0}\n'.format(path.join(args.model_dir, lang + '.model')))
 
 
 def write_models(models):
     for lang, model in models.items():
         with open(path.join(args.model_dir, lang + '.model'), 'w', encoding='utf-8') as f:
-            f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(models.items(), key=lambda x: -x[1])) + '\n') # .encode('utf8')
+            f.write('\n'.join(u'{0}\t{1}'.format(ngram, prob) for ngram, prob in sorted(models.items(), key=lambda x: -x[1])) + '\n')
 
 
 def read_models():
@@ -171,7 +171,7 @@ def read_models():
         stderr.write('Reading {0}\n'.format(fn))
         with open(path.join(args.model_dir, fn), 'r', encoding='utf-8') as f:
             for l in f:
-                ngram, prob = l.split('\t') # l.decode('utf8')
+                ngram, prob = l.split('\t')
                 models[lang][ngram] = float(prob)
     return models
 
